@@ -1,5 +1,3 @@
-from typing import NamedTuple
-
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from datetime import date
@@ -75,6 +73,26 @@ def get_info_message_text(day: Day, pairs_time: PairsTime, week_type_to_show: In
             text_parts.pop(-1)
 
     return "\n".join(text_parts)
+
+
+# Bug fix: Issue #1
+def filter_pairs(
+        week: list[Day],
+        filter_week: WeekTypes
+) -> list[Day]:
+    week_filtered = list(
+        filter(
+            lambda day: any(
+                isinstance(pair.details, PairDetails) or
+                filter_week == WeekTypes.UPPER and pair.details.upper or
+                filter_week == WeekTypes.LOWER and pair.details.lower
+                for pair in day.pairs
+            ),
+            week
+        )
+    )
+
+    return week_filtered
 
 
 async def handle_selected_day(

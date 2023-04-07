@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from database.Schedule import WeekTypes
 from routes.users import utils
 from routes.users.callback_factories import ScheduleMenuCallbackFactory, ScheduleTypes, \
     ShowScheduleCallbackFactory, Show, ChooseDayCallBackFactory, ChooseWeekTypeCallbackFactory, \
@@ -16,7 +17,7 @@ from routes.users.keyboards.inline import schedule_menu, schedule_find_group_err
 from routes.users.misc.message_texts import schedule_find_group_error_text, group_schedule_menu_text
 from routes.users.states import WatchGroupSchedule
 from database import Schedule, Users, CollectionNames
-from routes.users.utils.schedule import handle_selected_day, get_info_message_text
+from routes.users.utils.schedule import handle_selected_day, get_info_message_text, get_week_type, filter_pairs
 
 router = Router()
 
@@ -67,6 +68,18 @@ async def chosen_day_user_group_schedule(
 ):
     state_data = await state.get_data()
     user_group_schedule: Schedule.Model = state_data.get("user_group_schedule")
+
+    # Bug fix: Issue #1
+    current_week: WeekTypes = get_week_type(InlineWeekTypes.CURRENT)
+    user_group_schedule = Schedule.Model(
+        **{
+            **user_group_schedule.dict(),
+            "week": filter_pairs(
+                week=user_group_schedule.week,
+                filter_week=current_week
+            )
+        }
+    )
 
     today_index = datetime.today().weekday()
 
@@ -133,6 +146,17 @@ async def chosen_day_schedule(
     user_group_schedule: Schedule.Model = state_data.get("user_group_schedule")
     chosen_weekday_index: int | Literal["FULL"] = state_data.get("chosen_day")
 
+    # Bug fix: Issue #1
+    user_group_schedule = Schedule.Model(
+        **{
+            **user_group_schedule.dict(),
+            "week": filter_pairs(
+                week=user_group_schedule.week,
+                filter_week=callback_data.week_type
+            )
+        }
+    ) if callback_data.week_type != InlineWeekTypes.FULL else user_group_schedule
+
     if isinstance(chosen_weekday_index, int):
         await handle_selected_day(
             callback=callback,
@@ -178,6 +202,17 @@ async def full_schedule(
     state_data = await state.get_data()
     user_group_schedule: Schedule.Model = state_data.get("user_group_schedule")
     week_type: InlineWeekTypes = state_data.get("selected_week_type")
+
+    # Bug fix: Issue #1
+    user_group_schedule = Schedule.Model(
+        **{
+            **user_group_schedule.dict(),
+            "week": filter_pairs(
+                week=user_group_schedule.week,
+                filter_week=week_type
+            )
+        }
+    ) if week_type != InlineWeekTypes.FULL else user_group_schedule
 
     try:
         await callback.message.edit_text(
