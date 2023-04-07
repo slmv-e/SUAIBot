@@ -23,4 +23,25 @@ class ChangeGroup(StatesGroup):
 class ModifySchedule(StatesGroup):
     choose_action = State()
     choose_week = State()
+
+
+class ModifyScheduleRemove(StatesGroup):
     choose_pair = State()
+    confirm = State()
+
+
+class ModifyScheduleTransfer(StatesGroup):
+    choose_exist_pair = State()
+    choose_week = State()
+    choose_free_pair = State()
+    choose_audience = State()
+    confirm = State()
+
+
+class ModifyScheduleAdd(StatesGroup):
+    choose_free_pair = State()
+    choose_pair_type = State()
+    choose_pair_name = State()
+    choose_audience = State()
+    choose_teachers = State()
+    confirm = State()
