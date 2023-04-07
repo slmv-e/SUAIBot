@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from typing import Literal
 
 from database import Teachers, Schedule
+from database.Schedule import WeekTypes
 from routes.users import utils
 from routes.users.callback_factories import ScheduleMenuCallbackFactory, ShowScheduleCallbackFactory, Show, \
     ScheduleTypes, ChooseDayCallBackFactory, ChooseWeekTypeCallbackFactory, FullScheduleNavCallbackFactory, \
@@ -15,7 +16,7 @@ from routes.users.states import WatchTeacherSchedule
 from routes.users.keyboards.inline import schedule_menu, choose_day_menu, choose_week_type_menu, \
     full_schedule_nav_keyboard
 from routes.users.misc.message_texts import teacher_schedule_menu_text
-from routes.users.utils.schedule import handle_selected_day, get_info_message_text
+from routes.users.utils.schedule import handle_selected_day, get_info_message_text, get_week_type, filter_pairs
 
 router = Router()
 
@@ -89,6 +90,22 @@ async def chosen_day_teacher_schedule(
 
     today_index = datetime.today().weekday()
 
+    # Bug fix: Issue #1
+    current_week: WeekTypes = get_week_type(InlineWeekTypes.CURRENT)
+    selected_teacher = Teachers.Model(
+        **{
+            **selected_teacher.dict(),
+            "schedule": Schedule.BaseSchedule(
+                **{
+                    "week": filter_pairs(
+                        week=selected_teacher.schedule.week,
+                        filter_week=current_week
+                    )
+                }
+            )
+        }
+    )
+
     if callback_data.show != Show.WEEK:
         await handle_selected_day(
             callback=callback,
@@ -153,6 +170,21 @@ async def chosen_day_schedule(
     selected_teacher: Teachers.Model = state_data.get("selected_teacher")
     chosen_weekday_index: int | Literal["FULL"] = state_data.get("chosen_day")
 
+    # Bug fix: Issue #1
+    selected_teacher = Teachers.Model(
+        **{
+            **selected_teacher.dict(),
+            "schedule": Schedule.BaseSchedule(
+                **{
+                    "week": filter_pairs(
+                        week=selected_teacher.schedule.week,
+                        filter_week=callback_data.week_type
+                    )
+                }
+            )
+        }
+    ) if callback_data.week_type != InlineWeekTypes.FULL else selected_teacher
+
     if isinstance(chosen_weekday_index, int):
         await handle_selected_day(
             callback=callback,
@@ -199,6 +231,21 @@ async def full_schedule(
     selected_teacher: Teachers.Model = state_data.get("selected_teacher")
     week_type: InlineWeekTypes = state_data.get("selected_week_type")
 
+    # Bug fix: Issue #1
+    selected_teacher = Teachers.Model(
+        **{
+            **selected_teacher.dict(),
+            "schedule": Schedule.BaseSchedule(
+                **{
+                    "week": filter_pairs(
+                        week=selected_teacher.schedule.week,
+                        filter_week=week_type
+                    )
+                }
+            )
+        }
+    ) if week_type != InlineWeekTypes.FULL else selected_teacher
+
     try:
         await callback.message.edit_text(
             text=html.bold(f"{callback_data.index + 1} из {len(selected_teacher.schedule.week)}\n\n") +
@@ -216,4 +263,3 @@ async def full_schedule(
         )
     except aiogram.exceptions.TelegramBadRequest:
         await callback.answer("⚠️ Вы уже находитесь на нужной странице")
-
