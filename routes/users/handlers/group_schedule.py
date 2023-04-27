@@ -152,7 +152,7 @@ async def chosen_day_schedule(
             **user_group_schedule.dict(),
             "week": filter_pairs(
                 week=user_group_schedule.week,
-                filter_week=callback_data.week_type
+                filter_week=get_week_type(callback_data.week_type)
             )
         }
     ) if callback_data.week_type != InlineWeekTypes.FULL else user_group_schedule
@@ -209,7 +209,7 @@ async def full_schedule(
             **user_group_schedule.dict(),
             "week": filter_pairs(
                 week=user_group_schedule.week,
-                filter_week=week_type
+                filter_week=get_week_type(week_type)
             )
         }
     ) if week_type != InlineWeekTypes.FULL else user_group_schedule

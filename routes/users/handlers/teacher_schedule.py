@@ -178,7 +178,7 @@ async def chosen_day_schedule(
                 **{
                     "week": filter_pairs(
                         week=selected_teacher.schedule.week,
-                        filter_week=callback_data.week_type
+                        filter_week=get_week_type(callback_data.week_type)
                     )
                 }
             )
@@ -239,7 +239,7 @@ async def full_schedule(
                 **{
                     "week": filter_pairs(
                         week=selected_teacher.schedule.week,
-                        filter_week=week_type
+                        filter_week=get_week_type(week_type)
                     )
                 }
             )
