@@ -1,21 +1,27 @@
-import collections
+import dataclasses
+import hashlib
+from pprint import pprint
 
 import aiogram.exceptions
-from aiogram import Router, html
+from aiogram import Router, html, F
 from aiogram.filters import Text
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message, InlineQuery, InlineQueryResultArticle, InputTextMessageContent
 from aiogram.fsm.context import FSMContext
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from database import Users, CollectionNames, Schedule
-from database.Schedule import WeekTypes, DayName, Day
+from database.Schedule import DayName, Day, WeekBaseUpper, WeekBaseLower, PairDetails, Pair
+from routes.users.handlers.learning_menu import learning_menu
+from routes.users.handlers.teacher_search import Search
 from routes.users.misc.message_texts import schedule_find_group_error_text
 from routes.users.states import ModifySchedule, ModifyScheduleTransfer, ModifyScheduleAdd, ModifyScheduleRemove
 from routes.users.keyboards.inline import modify_schedule_actions_keyboard, schedule_find_group_error_keyboard, \
-    modify_schedule_weeks_keyboard, PairNumbers, full_schedule_nav_modify
+    modify_schedule_weeks_keyboard, full_schedule_nav_modify, choose_pair_type_keyboard, find_pair_name_keyboard, \
+    confirm_keyboard
 from routes.users.callback_factories import ChooseModifyActionCallbackFactory, ChooseModifyWeekCallbackFactory, \
-    InlineWeekTypes, FullScheduleNavCallbackFactory, ModifyActions
-from routes.users.utils.schedule import get_info_message_text, filter_pairs
+    InlineWeekTypes, FullScheduleNavCallbackFactory, ModifyActions, PairNumbers, ChooseModifyPairCallbackFactory, \
+    ChoosePairTypeCallbackFactory
+from routes.users.utils.schedule import get_info_message_text, filter_pairs, AddActionPairDetails
 
 router = Router()
 
@@ -38,27 +44,27 @@ def get_pairs_array(
             pair.details.upper and arr.append(
                 PairNumbers(
                     number=pair.number,
-                    week=WeekTypes.UPPER
+                    week=WeekBaseUpper
                 )
             )
             pair.details.lower and arr.append(
                 PairNumbers(
                     number=pair.number,
-                    week=WeekTypes.LOWER
+                    week=WeekBaseLower
                 )
             )
         elif week == InlineWeekTypes.UPPER and pair.details.upper:
             arr.append(
                 PairNumbers(
                     number=pair.number,
-                    week=WeekTypes.UPPER
+                    week=WeekBaseUpper
                 )
             )
         elif week == InlineWeekTypes.LOWER and pair.details.lower:
             arr.append(
                 PairNumbers(
                     number=pair.number,
-                    week=WeekTypes.LOWER
+                    week=WeekBaseLower
                 )
             )
 
@@ -79,14 +85,14 @@ def get_pairs_array(
                     arr.append(
                         PairNumbers(
                             number=pair_number,
-                            week=WeekTypes.LOWER
+                            week=WeekBaseLower
                         )
                     )
                 elif week == InlineWeekTypes.UPPER:
                     arr.append(
                         PairNumbers(
                             number=pair_number,
-                            week=WeekTypes.UPPER
+                            week=WeekBaseUpper
                         )
                     )
 
@@ -94,7 +100,7 @@ def get_pairs_array(
 
 
 @router.callback_query(
-    Text("modify_schedule"))  # ДОБАВИТЬ УСЛОВИЕ "ЕСЛИ У ПОЛЬЗОВАТЕЛЯ ЕСТЬ МОДИФИЦИРОВАННОЕ РАСПИСАНИЕ"
+    Text("modify_schedule"))
 async def modify_schedule_menu(
         callback: CallbackQuery,
         state: FSMContext,
@@ -106,7 +112,13 @@ async def modify_schedule_menu(
             collection=db_client[CollectionNames.USERS.value]
     ):
         user_group_schedule: Schedule.Model
-        user_group_schedule, = filter(lambda group_schedule: group_schedule.group == user_group, groups_schedule)
+        if custom_schedule := await Users.handlers.get_user_custom_schedule(
+                tg_id=callback.from_user.id,
+                collection=db_client[CollectionNames.USERS.value]
+        ):
+            user_group_schedule = custom_schedule
+        else:
+            user_group_schedule, = filter(lambda group_schedule: group_schedule.group == user_group, groups_schedule)
 
         await callback.message.edit_text(
             text="Выберите действие:",
@@ -230,16 +242,16 @@ async def handle_chosen_week(
 
 
 @router.callback_query(
-    ModifyScheduleRemove.choose_pair,
-    FullScheduleNavCallbackFactory.filter()
+    FullScheduleNavCallbackFactory.filter(),
+    ModifyScheduleRemove.choose_pair
 )
 @router.callback_query(
-    ModifyScheduleTransfer.choose_exist_pair,
-    FullScheduleNavCallbackFactory.filter()
+    FullScheduleNavCallbackFactory.filter(),
+    ModifyScheduleTransfer.choose_exist_pair
 )
 @router.callback_query(
-    ModifyScheduleAdd.choose_free_pair,
-    FullScheduleNavCallbackFactory.filter()
+    FullScheduleNavCallbackFactory.filter(),
+    ModifyScheduleAdd.choose_free_pair
 )
 async def full_schedule(
         callback: CallbackQuery,
@@ -280,3 +292,298 @@ async def full_schedule(
         )
     except aiogram.exceptions.TelegramBadRequest:
         await callback.answer("⚠️ Вы уже находитесь на нужной странице")
+
+
+@router.callback_query(
+    ChooseModifyPairCallbackFactory.filter(),
+    ModifyScheduleAdd.choose_free_pair
+)
+async def choose_free_pair_add(
+        callback: CallbackQuery,
+        callback_data: ChooseModifyPairCallbackFactory,
+        state: FSMContext
+):
+    await state.update_data(pair_details=AddActionPairDetails(
+        number=callback_data.number,
+        week=callback_data.week,
+        day_index=callback_data.day_index
+    ))
+
+    await callback.message.edit_text(
+        text=html.bold("Выберите тип пары:"),
+        reply_markup=choose_pair_type_keyboard(),
+        parse_mode="HTML"
+    )
+
+    await state.set_state(ModifyScheduleAdd.choose_pair_type)
+
+
+@router.callback_query(
+    ChoosePairTypeCallbackFactory.filter(),
+    ModifyScheduleAdd.choose_pair_type
+)
+async def choose_pair_type_add(
+        callback: CallbackQuery,
+        callback_data: ChoosePairTypeCallbackFactory,
+        state: FSMContext
+):
+    state_data = await state.get_data()
+
+    pair_details: AddActionPairDetails = state_data.get("pair_details")
+    pair_details.type = callback_data.pair_type.value
+
+    await state.update_data(pair_details=pair_details)
+
+    await callback.message.edit_text(
+        text=html.bold("Введите название пары:"),
+        reply_markup=find_pair_name_keyboard(),
+        parse_mode="HTML"
+    )
+
+    await state.set_state(ModifyScheduleAdd.choose_pair_name)
+
+
+@router.inline_query(
+    ModifyScheduleAdd.choose_pair_name,
+    F.query.startswith("pairs")
+)
+async def pair_name_search(
+        inline_query: InlineQuery,
+        state: FSMContext
+):
+    state_data = await state.get_data()
+    user_group_schedule: Schedule.Model = state_data.get("user_group_schedule")
+    _, *values = inline_query.query.split()
+    search_request = " ".join(values)
+
+    pairs = [pair for day in user_group_schedule.week for pair in day.pairs]
+    pairs_names = set()
+
+    for pair in pairs:
+        if isinstance(pair.details, PairDetails):
+            pairs_names.add(pair.details.name)
+        else:
+            if pair.details.upper:
+                pairs_names.add(pair.details.upper.name)
+            if pair.details.lower:
+                pairs_names.add(pair.details.lower.name)
+
+    search_data = Search(
+        request=search_request,
+        results=[
+            InlineQueryResultArticle(
+                id=int(hashlib.md5(pair_name.encode()).hexdigest(), 16),
+                title=pair_name,
+                description="Описание",
+                input_message_content=InputTextMessageContent(
+                    message_text=pair_name,
+                    parse_mode="HTML"
+                ),
+            )
+            for pair_name in pairs_names
+            if not search_request or search_request.lower() in pair_name.lower()
+        ]
+    )
+
+    await inline_query.answer(search_data.results, is_personal=True)
+
+
+@router.message(
+    ModifyScheduleAdd.choose_pair_name
+)
+async def choose_pair_name(
+        message: Message,
+        state: FSMContext
+):
+    state_data = await state.get_data()
+
+    pair_details: AddActionPairDetails = state_data.get("pair_details")
+    pair_details.name = message.text.strip()
+
+    await state.update_data(pair_details=pair_details)
+
+    await message.answer(
+        text=html.bold("Введите аудиторию:"),
+        parse_mode="HTML"
+    )
+
+    await state.set_state(ModifyScheduleAdd.choose_audience)
+
+
+@router.message(
+    ModifyScheduleAdd.choose_audience
+)
+async def choose_pair_name(
+        message: Message,
+        state: FSMContext
+):
+    state_data = await state.get_data()
+
+    pair_details: AddActionPairDetails = state_data.get("pair_details")
+    pair_details.audience = message.text.strip()
+
+    await state.update_data(pair_details=pair_details)
+
+    await message.answer(
+        text=html.bold("Введите имя преподавателя:"),
+        parse_mode="HTML"
+    )
+
+    await state.set_state(ModifyScheduleAdd.choose_teachers)
+
+
+@router.message(
+    ModifyScheduleAdd.choose_teachers
+)
+async def add_confirm(
+        message: Message,
+        state: FSMContext,
+        pairs_time
+):
+    state_data = await state.get_data()
+
+    pair_details: AddActionPairDetails = state_data.get("pair_details")
+    pair_details.teacher_names = [message.text.strip()]
+
+    user_group_schedule: Schedule.Model = state_data.get("empty_days_user_group_schedule")
+    day_schedule = user_group_schedule.week[pair_details.day_index].copy(deep=True)
+
+    pair_details.groups = [user_group_schedule.group]
+
+    match pair_details.week:
+        case InlineWeekTypes.FULL:
+            day_schedule.pairs.append(
+                Pair.parse_obj({
+                    "number": pair_details.number,
+                    "details": PairDetails.parse_obj(dataclasses.asdict(pair_details, dict_factory=dict))
+                })
+            )
+        case InlineWeekTypes.UPPER:
+            for pair in day_schedule.pairs:
+                if pair.number == pair_details.number:
+                    pair.details.upper = PairDetails.parse_obj(dataclasses.asdict(pair_details, dict_factory=dict))
+                    break
+            else:
+                day_schedule.pairs.append(
+                    Pair.parse_obj({
+                        "number": pair_details.number,
+                        "details": {
+                            "upper": PairDetails.parse_obj(dataclasses.asdict(pair_details, dict_factory=dict))
+                        }
+                    })
+                )
+        case InlineWeekTypes.LOWER:
+            for pair in day_schedule.pairs:
+                if pair.number == pair_details.number:
+                    pair.details.lower = PairDetails.parse_obj(dataclasses.asdict(pair_details, dict_factory=dict))
+                    break
+            else:
+                day_schedule.pairs.append(
+                    Pair.parse_obj({
+                        "number": pair_details.number,
+                        "details": {
+                            "lower": PairDetails.parse_obj(dataclasses.asdict(pair_details, dict_factory=dict))
+                        }
+                    })
+                )
+
+    def replace_day(week: list[Day]):
+        copied_week = week.copy()
+        copied_week[pair_details.day_index] = day_schedule
+        return copied_week
+
+    await state.update_data(custom_schedule=Schedule.Model.parse_obj({
+        "group": user_group_schedule.group,
+        "week": replace_day(user_group_schedule.week)
+    }))
+
+    await message.answer(
+        text=get_info_message_text(day_schedule, pairs_time, pair_details.week),
+        parse_mode="HTML",
+        reply_markup=confirm_keyboard()
+    )
+
+    await state.set_state(ModifyScheduleAdd.confirm)
+
+
+@router.callback_query(
+    ModifyScheduleAdd.confirm,
+    Text("confirm")
+)
+async def confirm_add(
+        callback: CallbackQuery,
+        state: FSMContext,
+        db_client: AsyncIOMotorDatabase
+):
+    state_data = await state.get_data()
+
+    await Users.handlers.add_custom_schedule(
+        tg_id=callback.from_user.id,
+        custom_schedule=state_data.get("custom_schedule"),
+        collection=db_client[CollectionNames.USERS.value]
+    )
+
+    await callback.message.edit_text(
+        text="👍Пара успешно добавлена"
+    )
+    await learning_menu(callback.message, state)
+
+
+@router.callback_query(
+    ChooseModifyPairCallbackFactory.filter(),
+    ModifyScheduleRemove.choose_pair
+)
+async def choose_pair_to_remove(
+        callback: CallbackQuery,
+        callback_data: ChooseModifyPairCallbackFactory,
+        state: FSMContext,
+        pairs_time
+):
+    state_data = await state.get_data()
+    user_group_schedule: Schedule.Model = state_data.get("user_group_schedule")
+
+    custom_schedule: Schedule.Model = user_group_schedule.copy(deep=True)
+
+    for pair in custom_schedule.week[callback_data.day_index].pairs:
+        if pair.number != callback_data.number:
+            continue
+
+        if callback_data.week == InlineWeekTypes.FULL:
+            custom_schedule.week[callback_data.day_index].pairs.remove(pair)
+        elif callback_data.week == InlineWeekTypes.LOWER:
+            pair.details.lower = None
+        elif callback_data.week == InlineWeekTypes.UPPER:
+            pair.details.upper = None
+
+    await state.update_data(custom_schedule=custom_schedule)
+
+    await callback.message.answer(
+        text=get_info_message_text(custom_schedule.week[callback_data.day_index], pairs_time, callback_data.week),
+        parse_mode="HTML",
+        reply_markup=confirm_keyboard()
+    )
+
+    await state.set_state(ModifyScheduleRemove.confirm)
+
+
+@router.callback_query(
+    ModifyScheduleRemove.confirm,
+    Text("confirm")
+)
+async def confirm_remove_pair(
+        callback: CallbackQuery,
+        state: FSMContext,
+        db_client: AsyncIOMotorDatabase
+):
+    state_data = await state.get_data()
+
+    await Users.handlers.add_custom_schedule(
+        tg_id=callback.from_user.id,
+        custom_schedule=state_data.get("custom_schedule"),
+        collection=db_client[CollectionNames.USERS.value]
+    )
+
+    await callback.message.edit_text(
+        text="👍Пара успешно удалена"
+    )
+    await learning_menu(callback.message, state)

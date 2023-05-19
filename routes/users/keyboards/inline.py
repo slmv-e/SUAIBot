@@ -1,18 +1,13 @@
-from typing import Optional, NamedTuple
+from typing import Optional
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardMarkup
 from database import Teachers
-from database.Schedule import WeekTypes
+from database.Schedule import WeekBaseUpper, WeekBaseLower
 from routes.users.callback_factories import ScheduleMenuCallbackFactory, ShowScheduleCallbackFactory, Show, \
     ScheduleTypes, ScheduleButtons, ChooseDayCallBackFactory, ChooseWeekTypeCallbackFactory, InlineWeekTypes, \
     SelectGroupCallbackFactory, FullScheduleNavCallbackFactory, ChooseModifyActionCallbackFactory, ModifyActions, \
-    ChooseModifyWeekCallbackFactory
-
-
-class PairNumbers(NamedTuple):
-    number: int
-    week: WeekTypes | None = None
-
+    ChooseModifyWeekCallbackFactory, ChooseModifyPairCallbackFactory, PairNumbers, ChoosePairTypeCallbackFactory
+from routes.users.utils.types import PairTypes
 
 back_button_text = "↩️Назад"
 
@@ -247,7 +242,6 @@ def modify_schedule_actions_keyboard() -> InlineKeyboardMarkup:
     )
 
     builder.button(**cancel_button_params)
-
     builder.adjust(3, 1)
 
     return builder.as_markup()
@@ -257,12 +251,12 @@ def modify_schedule_weeks_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text=f"{WeekTypes.UPPER.value.arrow}Нечетная",
+        text=f"{WeekBaseUpper.arrow.value}Нечетная",
         callback_data=ChooseModifyWeekCallbackFactory(week=InlineWeekTypes.UPPER)
     )
 
     builder.button(
-        text=f"{WeekTypes.LOWER.value.arrow}Четная",
+        text=f"{WeekBaseLower.arrow.value}Четная",
         callback_data=ChooseModifyWeekCallbackFactory(week=InlineWeekTypes.LOWER)
     )
 
@@ -286,9 +280,22 @@ def full_schedule_nav_modify(
     builder = InlineKeyboardBuilder()
 
     for pair_number in pair_numbers_array:
+        if pair_number.week == WeekBaseLower:
+            week = InlineWeekTypes.LOWER
+        elif pair_number.week == WeekBaseUpper:
+            week = InlineWeekTypes.UPPER
+        else:
+            week = InlineWeekTypes.FULL
+
+        cb = ChooseModifyPairCallbackFactory(
+                day_index=current_index,
+                week=week,
+                number=pair_number.number
+        )
+
         builder.button(
-            text=f"{pair_number.week.value.arrow if pair_number.week else ''}{pair_number.number}",
-            callback_data="..."
+            text=f"{pair_number.week.arrow.value if pair_number.week else ''}{pair_number.number}",
+            callback_data=cb
         )
 
     base = full_schedule_nav_keyboard_base(
@@ -305,5 +312,45 @@ def full_schedule_nav_modify(
         builder.adjust(len(pair_numbers_array), 4, 1)
     else:
         builder.adjust(4, 1)
+
+    return builder.as_markup()
+
+
+def choose_pair_type_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    for pair_type in PairTypes:
+        builder.button(
+            text=pair_type.value,
+            callback_data=ChoosePairTypeCallbackFactory(pair_type=pair_type)
+        )
+
+    builder.adjust(5)
+
+    return builder.as_markup()
+
+
+def find_pair_name_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="🔎 Поиск пары",
+        switch_inline_query_current_chat="pairs "
+    )
+
+    return builder.as_markup()
+
+
+def confirm_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="✅Подтвердить",
+        callback_data="confirm"
+    )
+
+    builder.button(
+        **cancel_button_params
+    )
 
     return builder.as_markup()

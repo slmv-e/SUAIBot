@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from typing import Literal
 
 from database import Teachers, Schedule
-from database.Schedule import WeekTypes
+from database.Schedule import WeekBaseUpper, WeekBaseLower
 from routes.users import utils
 from routes.users.callback_factories import ScheduleMenuCallbackFactory, ShowScheduleCallbackFactory, Show, \
     ScheduleTypes, ChooseDayCallBackFactory, ChooseWeekTypeCallbackFactory, FullScheduleNavCallbackFactory, \
@@ -91,7 +91,7 @@ async def chosen_day_teacher_schedule(
     today_index = datetime.today().weekday()
 
     # Bug fix: Issue #1
-    current_week: WeekTypes = get_week_type(InlineWeekTypes.CURRENT)
+    current_week: WeekBaseUpper | WeekBaseLower = get_week_type(InlineWeekTypes.CURRENT)
     selected_teacher = Teachers.Model(
         **{
             **selected_teacher.dict(),

@@ -6,7 +6,6 @@ from aiogram.fsm.context import FSMContext
 from routes.users.keyboards.reply import MainMenuButtons
 from routes.users.keyboards.inline import learning_menu_keyboard
 from routes.users.misc.message_texts import learning_menu_text, action_cancel_success_text
-from routes.users.states import ChangeGroup
 
 router = Router()
 
@@ -27,7 +26,7 @@ async def learning_menu(
 @router.callback_query(
     Text("return_to_learning_menu")
 )
-async def learning_menu(
+async def back_to_learning_menu(
         callback: CallbackQuery,
         state: FSMContext
 ):

@@ -65,14 +65,14 @@ class PairDetails(BaseModel):
     teacher_names: list[str]
 
 
-class WeekBase(NamedTuple):
-    arrow: Literal["▲", "▼"]
-    circle: Literal["🔴", "🔵"]
+class WeekBaseUpper(Enum):
+    arrow = "▲"
+    circle = "🔴"
 
 
-class WeekTypes(Enum):
-    UPPER = WeekBase(arrow="▲", circle="🔴")
-    LOWER = WeekBase(arrow="▼", circle="🔵")
+class WeekBaseLower(Enum):
+    arrow = "▼"
+    circle = "🔵"
 
 
 class WeekDifferentPairs(BaseModel):

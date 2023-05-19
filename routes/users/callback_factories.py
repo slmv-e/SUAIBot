@@ -1,6 +1,9 @@
 from aiogram.filters.callback_data import CallbackData
-from typing import Literal, Optional
+from typing import Literal, Optional, NamedTuple, Any
 from enum import Enum
+
+from database.Schedule import WeekBaseUpper, WeekBaseLower
+from routes.users.utils.types import PairTypes
 
 
 class Show(Enum):
@@ -37,6 +40,11 @@ class ModifyActions(Enum):
     TRANSFER = "transfer"
 
 
+class PairNumbers(NamedTuple):
+    number: int
+    week: WeekBaseLower | WeekBaseUpper | None = None
+
+
 class ScheduleMenuCallbackFactory(CallbackData, prefix="teacher_schedule_menu"):
     type: ScheduleTypes
     id: Optional[int] = None
@@ -69,3 +77,13 @@ class ChooseModifyActionCallbackFactory(CallbackData, prefix="choose_modify_acti
 
 class ChooseModifyWeekCallbackFactory(CallbackData, prefix="choose_modify_week"):
     week: InlineWeekTypes
+
+
+class ChooseModifyPairCallbackFactory(CallbackData, prefix="choose_modify_pair"):
+    day_index: int
+    number: int | str
+    week: InlineWeekTypes
+
+
+class ChoosePairTypeCallbackFactory(CallbackData, prefix="choose_pair_type"):
+    pair_type: PairTypes

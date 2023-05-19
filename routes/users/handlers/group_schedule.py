@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from database.Schedule import WeekTypes
+from database.Schedule import WeekBaseUpper, WeekBaseLower
 from routes.users import utils
 from routes.users.callback_factories import ScheduleMenuCallbackFactory, ScheduleTypes, \
     ShowScheduleCallbackFactory, Show, ChooseDayCallBackFactory, ChooseWeekTypeCallbackFactory, \
@@ -22,6 +22,7 @@ from routes.users.utils.schedule import handle_selected_day, get_info_message_te
 router = Router()
 
 
+# добавить возможность выбора какое расписание показать
 @router.callback_query(
     ScheduleMenuCallbackFactory.filter(F.type == ScheduleTypes.GROUP)
 )
@@ -35,8 +36,13 @@ async def user_group_schedule_menu(
             tg_id=callback.from_user.id,
             collection=db_client[CollectionNames.USERS.value]
     ):
-        user_group_schedule: Schedule.Model
-        user_group_schedule, = filter(lambda group_schedule: group_schedule.group == user_group, groups_schedule)
+        if custom_schedule := await Users.handlers.get_user_custom_schedule(
+                tg_id=callback.from_user.id,
+                collection=db_client[CollectionNames.USERS.value]
+        ):
+            user_group_schedule = custom_schedule
+        else:
+            user_group_schedule, = filter(lambda group_schedule: group_schedule.group == user_group, groups_schedule)
 
         await callback.message.edit_text(
             text=group_schedule_menu_text + html.bold(user_group),
@@ -70,7 +76,7 @@ async def chosen_day_user_group_schedule(
     user_group_schedule: Schedule.Model = state_data.get("user_group_schedule")
 
     # Bug fix: Issue #1
-    current_week: WeekTypes = get_week_type(InlineWeekTypes.CURRENT)
+    current_week: WeekBaseUpper | WeekBaseLower = get_week_type(InlineWeekTypes.CURRENT)
     user_group_schedule = Schedule.Model(
         **{
             **user_group_schedule.dict(),

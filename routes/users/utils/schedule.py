@@ -1,10 +1,13 @@
+import dataclasses
+from typing import Literal
+
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from datetime import date
 from aiogram import html
 
 from database import Schedule
-from database.Schedule import Day, PairsTime, PairDetails, WeekBase, WeekTypes, DayName
+from database.Schedule import Day, PairsTime, PairDetails, DayName, WeekBaseLower, WeekBaseUpper
 from routes.users.callback_factories import InlineWeekTypes, ChooseWeekTypeCallbackFactory, ShowScheduleCallbackFactory, \
     ScheduleTypes
 from routes.users.keyboards.inline import back_to_schedule_menu
@@ -17,29 +20,28 @@ def current_day() -> DayName:
             return day
 
 
-def get_week_type(week_type_to_show: InlineWeekTypes) -> WeekTypes:
+def get_week_type(week_type_to_show: InlineWeekTypes) -> WeekBaseUpper | WeekBaseLower:
     if week_type_to_show == InlineWeekTypes.UPPER:
-        return WeekTypes.UPPER
+        return WeekBaseUpper
     elif week_type_to_show == InlineWeekTypes.LOWER:
-        return WeekTypes.LOWER
+        return WeekBaseLower
     else:
         days_different = date.today() - date(2022, 8, 29)
-        return WeekTypes.UPPER if (days_different.days // 7 + 1) % 2 else WeekTypes.LOWER
+        return WeekBaseUpper if (days_different.days // 7 + 1) % 2 else WeekBaseLower
 
 
 def get_info_message_text(day: Day, pairs_time: PairsTime, week_type_to_show: InlineWeekTypes) -> str:
-    week_type: WeekTypes = get_week_type(week_type_to_show)
-    week_type_value: WeekBase = week_type.value
-    text_parts = [f"{week_type_value.circle if week_type_to_show != InlineWeekTypes.FULL else '📆'} {html.bold(day.name.value.upper())}", ""]
+    week_type: WeekBaseLower | WeekBaseUpper = get_week_type(week_type_to_show)
+    text_parts = [f"{week_type.circle.value if week_type_to_show != InlineWeekTypes.FULL else '📆'} {html.bold(day.name.value.upper())}", ""]
 
     def add_upper():
         text_parts.append(
-            f"{WeekTypes.UPPER.value.arrow} {html.bold(f'{pair.details.upper.type}-{pair.details.upper.name}')} ({html.code(', '.join(pair.details.upper.teacher_names))})")
+            f"{WeekBaseUpper.arrow.value} {html.bold(f'{pair.details.upper.type}-{pair.details.upper.name}')} ({html.code(', '.join(pair.details.upper.teacher_names))})")
         text_parts.append(f"{pair.details.upper.audience} ({html.code(', '.join(pair.details.upper.groups))})")
 
     def add_lower():
         text_parts.append(
-            f"{WeekTypes.LOWER.value.arrow} {html.bold(f'{pair.details.lower.type}-{pair.details.lower.name}')} ({html.code(', '.join(pair.details.lower.teacher_names))})")
+            f"{WeekBaseLower.arrow.value} {html.bold(f'{pair.details.lower.type}-{pair.details.lower.name}')} ({html.code(', '.join(pair.details.lower.teacher_names))})")
         text_parts.append(f"{pair.details.lower.audience} ({', '.join(pair.details.lower.groups)})")
 
     for pair in day.pairs:
@@ -63,10 +65,10 @@ def get_info_message_text(day: Day, pairs_time: PairsTime, week_type_to_show: In
             pair.details.upper and add_upper()
             pair.details.lower and add_lower()
             text_parts.append("")
-        elif week_type == WeekTypes.UPPER and pair.details.upper:
+        elif week_type == WeekBaseUpper and pair.details.upper:
             add_upper()
             text_parts.append("")
-        elif week_type == WeekTypes.LOWER and pair.details.lower:
+        elif week_type == WeekBaseLower and pair.details.lower:
             add_lower()
             text_parts.append("")
         else:
@@ -78,14 +80,14 @@ def get_info_message_text(day: Day, pairs_time: PairsTime, week_type_to_show: In
 # Bug fix: Issue #1
 def filter_pairs(
         week: list[Day],
-        filter_week: WeekTypes
+        filter_week: WeekBaseUpper | WeekBaseLower
 ) -> list[Day]:
     week_filtered = list(
         filter(
             lambda day: any(
                 isinstance(pair.details, PairDetails) or
-                filter_week == WeekTypes.UPPER and pair.details.upper or
-                filter_week == WeekTypes.LOWER and pair.details.lower
+                filter_week == WeekBaseUpper and pair.details.upper or
+                filter_week == WeekBaseLower and pair.details.lower
                 for pair in day.pairs
             ),
             week
@@ -124,3 +126,19 @@ async def handle_selected_day(
             parse_mode="HTML"
         )
     await state.set_state(state_group.watch_day)
+
+
+@dataclasses.dataclass
+class AddActionPairDetails:
+    number: int
+    week: InlineWeekTypes
+    day_index: int
+    type: Literal["ПР", "ЛР", "Л", "КР", "КП"] = None
+    name: str = None
+    groups: list[str] = None
+    audience: str = None
+    teacher_names: list[str] = None
+
+
+class ModifyScheduleUtils:
+    ...
