@@ -3,10 +3,12 @@ from typing import Optional
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardMarkup
 from database import Teachers
 from database.Schedule import WeekBaseUpper, WeekBaseLower
-from routes.users.callback_factories import ScheduleMenuCallbackFactory, ShowScheduleCallbackFactory, Show, \
-    ScheduleTypes, ScheduleButtons, ChooseDayCallBackFactory, ChooseWeekTypeCallbackFactory, InlineWeekTypes, \
-    SelectGroupCallbackFactory, FullScheduleNavCallbackFactory, ChooseModifyActionCallbackFactory, ModifyActions, \
-    ChooseModifyWeekCallbackFactory, ChooseModifyPairCallbackFactory, PairNumbers, ChoosePairTypeCallbackFactory
+from routes.users.callback_factories import ChooseModifyActionCallbackFactory, \
+    ChooseBuildingCallbackFactory, ChooseModifyPairCallbackFactory, ChooseModifyWeekCallbackFactory, \
+    ChoosePairTypeCallbackFactory, ChooseWeekTypeCallbackFactory, ScheduleMenuCallbackFactory, \
+    ShowScheduleCallbackFactory, ChooseDayCallBackFactory, SelectGroupCallbackFactory, FullScheduleNavCallbackFactory
+from routes.users.misc.types.enum import Show, InlineWeekTypes, ScheduleTypes, ScheduleButtons, ModifyActions, Buidings
+from routes.users.misc.types.named_tuple import PairNumbers
 from routes.users.utils.types import PairTypes
 
 back_button_text = "↩️Назад"
@@ -16,13 +18,18 @@ cancel_button_params = {
     "callback_data": "return_to_learning_menu"
 }
 
+search_teacher_button_props = {
+    "text": "👨‍🏫Поиск преподавателя",
+    "switch_inline_query_current_chat": "teachers "
+}
+
 
 def learning_menu_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     builder.button(text="📆Расписание", callback_data=ScheduleMenuCallbackFactory(type=ScheduleTypes.GROUP))
     builder.button(text="🔄Сменить группу", callback_data="change_group")
-    builder.button(text="👨‍🏫Поиск преподавателя", switch_inline_query_current_chat="teachers ")
+    builder.button(**search_teacher_button_props)
 
     builder.adjust(2, 1)
 
@@ -353,4 +360,31 @@ def confirm_keyboard() -> InlineKeyboardMarkup:
         **cancel_button_params
     )
 
+    return builder.as_markup()
+
+
+def choose_building_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text=Buidings.BOLSHAYA_MORSKAYA.value,
+        callback_data=ChooseBuildingCallbackFactory(building=Buidings.BOLSHAYA_MORSKAYA)
+    )
+    builder.button(
+        text=Buidings.GASTELLO.value,
+        callback_data=ChooseBuildingCallbackFactory(building=Buidings.GASTELLO)
+    )
+    builder.button(
+        text=Buidings.LENSOVETA.value,
+        callback_data=ChooseBuildingCallbackFactory(building=Buidings.LENSOVETA)
+    )
+
+    builder.adjust(1, 2)
+
+    return builder.as_markup()
+
+
+def choose_teacher_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(**search_teacher_button_props)
     return builder.as_markup()

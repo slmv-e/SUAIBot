@@ -138,7 +138,3 @@ class AddActionPairDetails:
     groups: list[str] = None
     audience: str = None
     teacher_names: list[str] = None
-
-
-class ModifyScheduleUtils:
-    ...

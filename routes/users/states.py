@@ -42,6 +42,7 @@ class ModifyScheduleAdd(StatesGroup):
     choose_free_pair = State()
     choose_pair_type = State()
     choose_pair_name = State()
+    choose_building = State()
     choose_audience = State()
     choose_teachers = State()
     confirm = State()

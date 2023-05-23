@@ -1,48 +1,7 @@
 from aiogram.filters.callback_data import CallbackData
-from typing import Literal, Optional, NamedTuple, Any
-from enum import Enum
-
-from database.Schedule import WeekBaseUpper, WeekBaseLower
+from typing import Literal, Optional
+from routes.users.misc.types.enum import ScheduleTypes, Show, InlineWeekTypes, ModifyActions, Buidings
 from routes.users.utils.types import PairTypes
-
-
-class Show(Enum):
-    TODAY = "today"
-    TOMORROW = "tomorrow"
-    WEEK = "week"
-
-
-class InlineWeekTypes(Enum):
-    CURRENT = "current"
-    FULL = "full"
-    UPPER = "upper"
-    LOWER = "lower"
-
-
-class ScheduleTypes(Enum):
-    TEACHER = "teacher"
-    GROUP = "group"
-
-
-class ScheduleButtons(Enum):
-    MONDAY = "Пн"
-    TUESDAY = "Вт"
-    WEDNESDAY = "Ср"
-    THURSDAY = "Чт"
-    FRIDAY = "Пт"
-    SATURDAY = "Сб"
-    FULL = "Вся неделя"
-
-
-class ModifyActions(Enum):
-    ADD = "add"
-    REMOVE = "remove"
-    TRANSFER = "transfer"
-
-
-class PairNumbers(NamedTuple):
-    number: int
-    week: WeekBaseLower | WeekBaseUpper | None = None
 
 
 class ScheduleMenuCallbackFactory(CallbackData, prefix="teacher_schedule_menu"):
@@ -87,3 +46,7 @@ class ChooseModifyPairCallbackFactory(CallbackData, prefix="choose_modify_pair")
 
 class ChoosePairTypeCallbackFactory(CallbackData, prefix="choose_pair_type"):
     pair_type: PairTypes
+
+
+class ChooseBuildingCallbackFactory(CallbackData, prefix="choose_building"):
+    building: Buidings

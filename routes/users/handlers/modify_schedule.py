@@ -1,6 +1,5 @@
 import dataclasses
 import hashlib
-from pprint import pprint
 
 import aiogram.exceptions
 from aiogram import Router, html, F
@@ -14,13 +13,15 @@ from database.Schedule import DayName, Day, WeekBaseUpper, WeekBaseLower, PairDe
 from routes.users.handlers.learning_menu import learning_menu
 from routes.users.handlers.teacher_search import Search
 from routes.users.misc.message_texts import schedule_find_group_error_text
+from routes.users.misc.types.enum import InlineWeekTypes, ModifyActions
+from routes.users.misc.types.named_tuple import PairNumbers
 from routes.users.states import ModifySchedule, ModifyScheduleTransfer, ModifyScheduleAdd, ModifyScheduleRemove
 from routes.users.keyboards.inline import modify_schedule_actions_keyboard, schedule_find_group_error_keyboard, \
     modify_schedule_weeks_keyboard, full_schedule_nav_modify, choose_pair_type_keyboard, find_pair_name_keyboard, \
-    confirm_keyboard
+    confirm_keyboard, choose_building_keyboard, choose_teacher_keyboard
 from routes.users.callback_factories import ChooseModifyActionCallbackFactory, ChooseModifyWeekCallbackFactory, \
-    InlineWeekTypes, FullScheduleNavCallbackFactory, ModifyActions, PairNumbers, ChooseModifyPairCallbackFactory, \
-    ChoosePairTypeCallbackFactory
+    FullScheduleNavCallbackFactory, ChooseModifyPairCallbackFactory, \
+    ChoosePairTypeCallbackFactory, ChooseBuildingCallbackFactory
 from routes.users.utils.schedule import get_info_message_text, filter_pairs, AddActionPairDetails
 
 router = Router()
@@ -403,7 +404,32 @@ async def choose_pair_name(
     await state.update_data(pair_details=pair_details)
 
     await message.answer(
-        text=html.bold("Введите аудиторию:"),
+        text=html.bold("Выберите корпус:"),
+        reply_markup=choose_building_keyboard(),
+        parse_mode="HTML"
+    )
+
+    await state.set_state(ModifyScheduleAdd.choose_building)
+
+
+@router.callback_query(
+    ChooseBuildingCallbackFactory.filter(),
+    ModifyScheduleAdd.choose_building
+)
+async def choose_building(
+        callback: CallbackQuery,
+        callback_data: ChooseBuildingCallbackFactory,
+        state: FSMContext
+):
+    state_data = await state.get_data()
+
+    pair_details: AddActionPairDetails = state_data.get("pair_details")
+    pair_details.audience = callback_data.building.value
+
+    await state.update_data(pair_details=pair_details)
+
+    await callback.message.edit_text(
+        text=html.bold("Ввведите номер аудитории (Например: 24-12):"),
         parse_mode="HTML"
     )
 
@@ -413,19 +439,20 @@ async def choose_pair_name(
 @router.message(
     ModifyScheduleAdd.choose_audience
 )
-async def choose_pair_name(
+async def choose_audience(
         message: Message,
         state: FSMContext
 ):
     state_data = await state.get_data()
 
     pair_details: AddActionPairDetails = state_data.get("pair_details")
-    pair_details.audience = message.text.strip()
+    pair_details.audience += f", ауд. {message.text.strip()}"
 
     await state.update_data(pair_details=pair_details)
 
     await message.answer(
         text=html.bold("Введите имя преподавателя:"),
+        reply_markup=choose_teacher_keyboard(),
         parse_mode="HTML"
     )
 
